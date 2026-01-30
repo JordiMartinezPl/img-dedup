@@ -56,8 +56,10 @@ def main():
     print(f"Scanning {src} \n")
 
     seen_hashes = set()
-    extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
-
+    extensions = {
+            '.jpg', '.jpeg', '.png', '.gif', '.webp', 
+            '.arw', '.cr2', '.cr3', '.dng', '.nef', '.orf', '.rw2'
+        }
     for file_path in src.rglob("*"):
         
         if not file_path.is_file() or file_path.suffix.lower() not in extensions:
