@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+import argparse
+import hashlib
+import shutil
+import sys
+from pathlib import Path
+
+def get_file_hash(file_path):
+    sha256_hash = hashlib.sha256()
+    try:
+        with open(file_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+    except Exception as e:
+        print(f"  [!] Error hashing {file_path.name}: {e}")
+        return None
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="CLI tool to detect and move duplicate images using SHA-256 hashing."
+    )
+    
+    parser.add_argument("-s", "--source", help="Source directory to scan", required=True)
+    parser.add_argument("-o", "--output", help="Directory for unique images", required=True)
+    parser.add_argument("-d", "--duplicates", help="Directory for duplicate images", required=True)
+
+    args = parser.parse_args()
+
+    src = Path(args.source).resolve()
+    out = Path(args.output).resolve()
+    dup = Path(args.duplicates).resolve()
+
+    if not src.is_dir():
+        print(f"Error: The source folder '{src}' does not exist.")
+        sys.exit(1)
+
+    if not out.is_dir():
+        ask = input(f"The output folder '{out}' does not exist. Create it? (y/n): ").lower().strip()
+        if ask == 'y':
+            out.mkdir(parents=True, exist_ok=True)
+            print("Output folder created.")
+        else:
+            print("Operation cancelled by user.")
+            sys.exit(0)
+
+    if not dup.is_dir():
+        ask = input(f"The duplicates folder '{dup}' does not exist. Create it? (y/n): ").lower().strip()
+        if ask == 'y':  
+            dup.mkdir(parents=True, exist_ok=True) 
+            print("Duplicates folder created.")
+        else:
+            print("Operation cancelled by user.")
+            sys.exit(0)
+    
+    print(f"Scanning {src} \n")
+
+    seen_hashes = set()
+    extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+
+    for file_path in src.rglob("*"):
+        
+        if not file_path.is_file() or file_path.suffix.lower() not in extensions:
+            continue
+        
+        if out in file_path.parents or dup in file_path.parents:
+            continue
+
+        f_hash = get_file_hash(file_path)
+        
+        if f_hash:
+            if f_hash in seen_hashes:
+                dest = dup / file_path.name
+                tag = "[DUP]"
+            else:
+                seen_hashes.add(f_hash)
+                dest = out / file_path.name
+                tag = "[OK] " 
+
+            try:
+                final_dest = dest
+                counter = 1
+                while final_dest.exists():
+                    final_dest = dest.with_name(f"{dest.stem}_{counter}{dest.suffix}")
+                    counter += 1
+                
+                shutil.move(str(file_path), str(final_dest))
+                print(f"{tag} Moved: {file_path.name} -> {final_dest.name}")
+            except Exception as e:
+                print(f"  [!] Failed to move {file_path.name}: {e}")
+
+if __name__ == "__main__":
+    main()
